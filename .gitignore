@@ -1,0 +1,14 @@
+### IntelliJ IDEA ###
+.idea
+gen
+sema
+out
+array-1.mx
+bin/ast
+bin/errors
+bin/Parser
+bin/scope
+bin/semantic
+bin/tools
+bin/Main.class
+configure
