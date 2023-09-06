@@ -2,6 +2,8 @@ package scope;
 
 import ast.TypeNode;
 import ast.statement.SingleVariableDefineNode;
+import ir.Instructions.AllocaInstruction;
+import ir.Value;
 
 import java.util.HashMap;
 
@@ -10,6 +12,7 @@ public class Scope {
 
     public HashMap<String, SingleVariableDefineNode> variableDefinitions = new HashMap<>();
 
+    public HashMap<String, AllocaInstruction> variables = new HashMap<>();
 
     public Scope(Scope f) {
         this.father = f;
@@ -20,7 +23,10 @@ public class Scope {
             throw new Error("variable redefinition occured at row:" + def.pos.row + " column:" + def.pos.column);
         }
         variableDefinitions.put(def.name,def);
-        return;
+    }
+
+    public void addVariable(String Name, AllocaInstruction v) {
+        variables.put(Name, v);
     }
 
     public SingleVariableDefineNode getVariableDefine(String name, boolean recursive) {
@@ -30,6 +36,19 @@ public class Scope {
         if (recursive && this.father != null)
             return this.father.getVariableDefine(name, true);
         return null;
+    }
+
+    public Value getVariable(String Name,boolean recursive) {
+        var i = variables.get(Name);
+        if (i != null) {
+            return i;
+        } else {
+            if (recursive && this.father != null) {
+                return this.father.getVariable(Name,recursive);
+            } else {
+                return null;
+            }
+        }
     }
 
     public boolean insideLoop() {
