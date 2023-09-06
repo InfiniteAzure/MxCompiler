@@ -184,8 +184,8 @@ public class InstructionSelector implements IRVisitor {
         if (inst.Op.size() == 1) {
             new JumpInstruction((Block) inst.Op.get(0).asm, tempBlock);
         } else {
-            new BeqzInstruction(getReg(inst.Op.get(0)), (Block) inst.Op.get(1).asm, tempBlock);
-            new JumpInstruction((Block) inst.Op.get(2).asm, tempBlock);
+            new BeqzInstruction(getReg(inst.Op.get(0)), (Block) inst.Op.get(2).asm, tempBlock);
+            new JumpInstruction((Block) inst.Op.get(1).asm, tempBlock);
         }
     }
 
