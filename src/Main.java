@@ -42,7 +42,7 @@ public class Main {
         new StackAllocator().runOnModule(ASMModule);
 
         var asmFile = new FileOutputStream("output.s");
-        var asm = new PrintStream(asmFile);
+        var asm = new PrintStream(System.out);
         new asmPrinter(asm).runOnModule(ASMModule);
         asmFile.close();
     }
