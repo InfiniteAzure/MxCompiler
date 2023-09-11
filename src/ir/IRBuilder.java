@@ -141,7 +141,7 @@ public class IRBuilder implements Visitor {
         var funcType = tempFunc.type();
         if (funcType.Return instanceof VoidType) {
             Ret();
-           } else {
+        } else {
             tempFunc.returnValue = new AllocaInstruction(getMemType(funcType.Return), rename("%.retval.addr"), tempFunc.entry);
             Ret(newLoad("%.retval", tempFunc.returnValue, tempFunc.exit));
         }
@@ -538,15 +538,12 @@ public class IRBuilder implements Visitor {
     public void visit(MemberCallNode node) {
         node.instance.accept(this);
         if (node.instance.type.Array) {
-            // .size function
             var ptr = new BitCastInstruction(nextName(), i32PtrType, getValue(node.instance), tempBlock);
             var sizePtr = new GetElementPtrInstruction(nextName(), i32PtrType, ptr, tempBlock, new IntConst(-1, 32));
             node.val = newLoad(nextName(), sizePtr, tempBlock);
         } else if (node.instance.type.name.equals("string")) {
-            // builtin function of string
             node.val = Program.getFunc("__str_" + node.member);
         } else {
-            // class
             var clsName = node.instance.type.name;
             var cls = Program.getClassScope(clsName);
             var clsType = Program.getClassType(clsName);
@@ -562,7 +559,34 @@ public class IRBuilder implements Visitor {
     }
 
     public void visit(TrinaryExpressionNode node) {
-        //TODO
+        node.condition.accept(this);
+        var trueBlock = new BasicBlock(rename("ter.true"), tempFunc);
+        var falseBlock = new BasicBlock(rename("ter.false"), tempFunc);
+        var endBlock = new BasicBlock(rename("ter.end"), tempFunc);
+        var retType = getType(node.type);
+        if (retType.equals(voidType)) {
+            new BrInstruction(getValue(node.condition), trueBlock, falseBlock, tempBlock);
+            tempBlock = trueBlock;
+            node.first.accept(this);
+            new BrInstruction(endBlock,trueBlock);
+            tempBlock = falseBlock;
+            node.second.accept(this);
+            new BrInstruction(endBlock,falseBlock);
+            tempBlock = endBlock;
+        } else {
+            node.ptr = newAlloca(getMemType(retType),"%ter.addr");
+            new BrInstruction(getValue(node.condition), trueBlock, falseBlock, tempBlock);
+            tempBlock = trueBlock;
+            node.first.accept(this);
+            newStore(getValue(node.first),node.ptr);
+            new BrInstruction(endBlock,trueBlock);
+            tempBlock = falseBlock;
+            node.second.accept(this);
+            newStore(getValue(node.first),node.ptr);
+            new BrInstruction(endBlock,falseBlock);
+            tempBlock = endBlock;
+
+        }
     }
 
     public void visit(ParameterListNode node) {
@@ -614,8 +638,9 @@ public class IRBuilder implements Visitor {
         if (type.Array) {
             var elemType = new TypeNode(type);
             elemType.arraySize--;
-            if (elemType.arraySize == 0)
+            if (elemType.arraySize == 0) {
                 elemType.Array = false;
+            }
             return new PointerType(getType(elemType));
         }
         if (type.name.equals("string"))
