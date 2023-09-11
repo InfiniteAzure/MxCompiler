@@ -568,10 +568,10 @@ public class IRBuilder implements Visitor {
             new BrInstruction(getValue(node.condition), trueBlock, falseBlock, tempBlock);
             tempBlock = trueBlock;
             node.first.accept(this);
-            new BrInstruction(endBlock,trueBlock);
+            new BrInstruction(endBlock,tempBlock);
             tempBlock = falseBlock;
             node.second.accept(this);
-            new BrInstruction(endBlock,falseBlock);
+            new BrInstruction(endBlock,tempBlock);
             tempBlock = endBlock;
         } else {
             node.ptr = newAlloca(getMemType(retType),"%ter.addr");
@@ -579,13 +579,12 @@ public class IRBuilder implements Visitor {
             tempBlock = trueBlock;
             node.first.accept(this);
             newStore(getValue(node.first),node.ptr);
-            new BrInstruction(endBlock,trueBlock);
+            new BrInstruction(endBlock,tempBlock);
             tempBlock = falseBlock;
             node.second.accept(this);
             newStore(getValue(node.first),node.ptr);
-            new BrInstruction(endBlock,falseBlock);
+            new BrInstruction(endBlock,tempBlock);
             tempBlock = endBlock;
-
         }
     }
 
