@@ -582,7 +582,7 @@ public class IRBuilder implements Visitor {
             new BrInstruction(endBlock,tempBlock);
             tempBlock = falseBlock;
             node.second.accept(this);
-            newStore(getValue(node.first),node.ptr);
+            newStore(getValue(node.second),node.ptr);
             new BrInstruction(endBlock,tempBlock);
             tempBlock = endBlock;
         }
