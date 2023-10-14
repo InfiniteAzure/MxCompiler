@@ -54,8 +54,11 @@ public class IRPrinter {
     }
 
     public void print(BasicBlock block) {
-        print.printf("%s:\n", block.name);
-        for (var i: block.instructions) {
+        print.printf("%s:  ; preds = %s\n", block.name, TextUtils.join(block.prev));
+        for (var i : block.phiInstructions) {
+            print.println("  " + i);
+        }
+        for (var i : block.instructions) {
             print.println("  " + i);
         }
     }

@@ -16,6 +16,19 @@ public class Value {
         this.name = Name;
     }
 
+    public void replaceAllUse(Value v) {
+        for (var user : users) {
+            var op = user.Op;
+            for (int i = 0; i < op.size(); ++i) {
+                if (op.get(i) == this) {
+                    op.set(i, v);
+                }
+            }
+            v.users.add(user);
+        }
+        users.clear();
+    }
+
     public String name() {
         return this.name;
     }

@@ -226,10 +226,24 @@ public class IRBuilder implements Visitor {
     }
 
     public void visit(IfNode node) {
-        var thenBlock = new BasicBlock(rename("if.then"), tempFunc);
-        var elseBlock = new BasicBlock(rename("if.else"), tempFunc);
-        var endBlock = new BasicBlock(rename("if.end"), tempFunc);
         node.condition.accept(this);
+        if (node.condition.val instanceof IntConst c) {
+            if (c.itself == 1) {
+                temp = node.oneScope;
+                node.one.accept(this);
+                temp = temp.father;
+            } else if (node.two != null) {
+                temp = node.twoScope;
+                node.two.accept(this);
+                temp = temp.father;
+            }
+            return;
+        }
+
+        var thenBlock = new BasicBlock("if.then",tempFunc);
+        var elseBlock = new BasicBlock("if.else",tempFunc);
+        var endBlock = new BasicBlock("if.end",tempFunc);
+
         new BrInstruction(getValue(node.condition), thenBlock, elseBlock, tempBlock);
 
         tempBlock = thenBlock;
@@ -245,6 +259,7 @@ public class IRBuilder implements Visitor {
             temp = temp.father;
         }
         new BrInstruction(endBlock, tempBlock);
+
         tempBlock = endBlock;
     }
 

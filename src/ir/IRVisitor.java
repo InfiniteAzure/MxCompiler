@@ -18,4 +18,6 @@ public interface IRVisitor {
     public void visit(StoreInstruction inst);
     public void visit(TruncInstruction inst);
     public void visit(ZextInstruction inst);
+    public void visit(PhiInstruction inst);
+    public void visit(MoveInstruction inst);
 }
