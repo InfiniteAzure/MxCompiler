@@ -14,4 +14,5 @@ public interface asmVisitor {
     public void visit(RetInstruction inst);
     public void visit(RTypeInstruction inst);
     public void visit(StoreInstruction inst);
+    public void visit(BrInstruction inst);
 }
