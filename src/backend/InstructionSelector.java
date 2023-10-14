@@ -376,7 +376,7 @@ public class InstructionSelector implements IRVisitor {
     }
 
     public void visit(MoveInstruction inst) {
-        MvOrLi(getReg(inst), inst.Op.get(0));
+        MvOrLi(getReg(inst.Op.get(0)), inst.Op.get(0));
     }
     //all phis are eliminated when running this.
     public void visit(PhiInstruction inst) {}
