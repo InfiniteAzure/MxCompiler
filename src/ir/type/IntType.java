@@ -10,10 +10,7 @@ public class IntType extends BasicType {
     }
 
     public int size() {
-        if (this.memorySize == 1) {
-            return 1;
-        }
-        return this.memorySize / 8;
+        return (this.memorySize - 1) / 8 + 1;
     }
 
     public String toString() {
