@@ -5,6 +5,8 @@ import asm.asmVisitor;
 import asm.operand.Imm;
 import asm.operand.SimpleReg;
 
+import java.util.HashSet;
+
 public class StoreInstruction extends BasicInstruction {
     public SimpleReg rs1, rs2;
     public Imm offset;
@@ -29,4 +31,23 @@ public class StoreInstruction extends BasicInstruction {
     public void accept(asmVisitor visitor) {
         visitor.visit(this);
     }
+    public HashSet<SimpleReg> uses() {
+        var ret = new HashSet<SimpleReg>();
+        ret.add(rs1);
+        ret.add(rs2);
+        return ret;
+    }
+
+    public HashSet<SimpleReg> defs() {
+        return new HashSet<>();
+    }
+
+    public void replaceUse(SimpleReg oldReg, SimpleReg newReg) {
+        if (rs1 == oldReg)
+            rs1 = newReg;
+        if (rs2 == oldReg)
+            rs2 = newReg;
+    }
+
+    public void replaceDef(SimpleReg oldReg, SimpleReg newReg) {}
 }
