@@ -2,6 +2,7 @@ package asm.operand;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 public class PhysicalReg extends SimpleReg {
     public String name;
@@ -9,9 +10,19 @@ public class PhysicalReg extends SimpleReg {
     public PhysicalReg (String Name) {
         this.name = Name;
     }
+
+    public static PhysicalReg zero, ra, sp;
     public static HashMap<String, PhysicalReg> regMap = new HashMap<>();
     public static ArrayList<PhysicalReg> Caller = new ArrayList<>();
     public static ArrayList<PhysicalReg> Callee = new ArrayList<>();
+    public static HashSet<PhysicalReg> assignable = new HashSet<>();
+
+    public static PhysicalReg reg(String name) {
+        return regMap.get(name);
+    }
+    public static PhysicalReg regA(int i) { return reg("a" + i); }
+    public static PhysicalReg regS(int i) { return reg("s" + i); }
+    public static PhysicalReg regT(int i) { return reg("t" + i); }
 
     static {
         regMap.put("zero", new PhysicalReg("zero"));
@@ -32,6 +43,18 @@ public class PhysicalReg extends SimpleReg {
             regMap.put("s" + i, reg);
             Callee.add(reg);
         }
+
+        assignable.addAll(Caller);
+        assignable.addAll(Callee);
+
+        zero = new PhysicalReg("zero");
+        ra = new PhysicalReg("ra");
+        sp = new PhysicalReg("sp");
+        regMap.put("zero", zero);
+        regMap.put("ra", ra);
+        regMap.put("sp", sp);
+        Caller.add(ra);
+        Callee.add(sp);
     }
 
     public String toString() {
