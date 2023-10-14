@@ -58,6 +58,7 @@ public class StackAllocator implements asmVisitor, Pass {
 
     //only instructions above need to calculate offset
     public void visit(BeqzInstruction inst) {}
+    public void visit(BrInstruction inst) {}
     public void visit(CallInstruction inst) {}
     public void visit(JumpInstruction inst) {}
     public void visit(LiInstruction inst) {}

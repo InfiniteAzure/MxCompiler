@@ -8,11 +8,11 @@ import asm.instruction.StoreInstruction;
 import asm.instruction.*;
 import asm.operand.*;
 import ir.IRVisitor;
+import ir.Instructions.BrInstruction;
 import ir.Instructions.*;
 import ir.type.PointerType;
 
 import java.util.ArrayList;
-import java.util.Objects;
 
 public class InstructionSelector implements IRVisitor {
     public asmModule module;
@@ -62,28 +62,45 @@ public class InstructionSelector implements IRVisitor {
     public void visit(ir.Module irModule) {
         for (var v : irModule.globalVariables) {
             var init = getConstVal(v.init);
-            int init_;
-            init_ = Objects.requireNonNullElse(init, 0);
-            v.asm = new GlobalVariable(v.name.substring(1), init_, v.type.size());
+            v.asm = new GlobalVariable(v.name.substring(1),
+                    init == null ? 0 : init, v.type.size());
             module.globalVars.add((GlobalVariable) v.asm);
         }
         for (var s : irModule.strings) {
             s.asm = new StringConst(s.name.substring(1), s.itself);
             module.stringConsts.add((StringConst) s.asm);
         }
+        for (var func : irModule.functions) {
+            var asmFunc = new asm.Function(func.name.substring(1));
+            func.asm = asmFunc;
+            for (var arg : func.Op) {
+                arg.asm = new VirtualReg(4);
+                asmFunc.args.add((SimpleReg) arg.asm);
+            }
+        }
+        for (var i : irModule.functionsDeclarations)
+            i.asm = new asm.Function(i.name.substring(1));
+
         for (var i : irModule.functions) {
             i.accept(this);
         }
     }
 
     public void visit(ir.Function func) {
-        tempFunc = new asm.Function(func.name.substring(1));
+        tempFunc = (asm.Function) func.asm;
         module.funcs.add(tempFunc);
-        VirtualReg.VirtualRegCount = 0;
 
         for (var i : func.blocks) {
-            i.asm = new Block(i.name);
+            i.asm = new Block(i.name,i.LoopDepth);
             tempFunc.blocks.add((Block) i.asm);
+        }
+        tempFunc.entry = (Block) func.entry.asm;
+        tempFunc.exit = (Block) func.exit.asm;
+
+        for (var i : func.blocks) {
+            var asmBlock = (asm.Block) i.asm;
+            i.prev.forEach(b -> asmBlock.prevs.add((asm.Block) b.asm));
+            i.next.forEach(b -> asmBlock.nexts.add((asm.Block) b.asm));
         }
         tempBlock = (Block) func.entry.asm;
 
@@ -91,6 +108,7 @@ public class InstructionSelector implements IRVisitor {
 
         VirtualReg savedRa = new VirtualReg(4);
         new MvInstruction(savedRa, ra, tempBlock);
+
         var savedRegs = new ArrayList<SimpleReg>();
         for (var reg : PhysicalReg.Callee) {
             var rd = new VirtualReg(4);
@@ -101,7 +119,7 @@ public class InstructionSelector implements IRVisitor {
         for (int i = 0; i < func.Op.size(); ++i) {
             var arg = func.Op.get(i);
             if (i < 8) {
-                arg.asm = RegA(i);
+                new MvInstruction(tempFunc.args.get(i), PhysicalReg.regA(i), tempBlock);
             } else {
                 var reg = new VirtualReg(4);
                 arg.asm = reg;
@@ -126,7 +144,36 @@ public class InstructionSelector implements IRVisitor {
 
     public void visit(ir.BasicBlock block) {
         tempBlock = (Block) block.asm;
-        block.instructions.forEach(x -> x.accept(this));
+        var iter = block.instructions.listIterator(0);
+        while (iter.hasNext()) {
+            if (iter.nextIndex() >= block.instructions.size() - 2) {
+                break;
+            }
+
+            var inst = iter.next();
+            inst.accept(this);
+        }
+        var inst1 = iter.hasNext() ? iter.next() : null;
+        var inst2 = iter.hasNext() ? iter.next() : null;
+        if (inst1 instanceof IcmpInstruction icmp && inst2 instanceof ir.Instructions.BrInstruction br
+                && br.Op.get(0) == icmp && br.Op.size() > 1) {
+            var op = switch (icmp.op) {
+                case "eq" -> "bne";
+                case "ne" -> "beq";
+                case "sgt" -> "ble";
+                case "sge" -> "blt";
+                case "slt" -> "bge";
+                case "sle" -> "bgt";
+                default -> null;
+            };
+            new asm.instruction.BrInstruction(op, getReg(icmp.Op.get(0)), getReg(icmp.Op.get(1)), (Block) br.Op.get(2).asm, tempBlock);
+            new JumpInstruction((Block)  br.Op.get(1).asm, tempBlock);
+        } else {
+            if (inst1 != null)
+                inst1.accept(this);
+            if (inst2 != null)
+                inst2.accept(this);
+        }
     }
 
     public void visit(AllocaInstruction instruction) {
@@ -193,7 +240,8 @@ public class InstructionSelector implements IRVisitor {
         for (int i = 0; i + 1 < inst.Op.size(); ++i) {
             var arg = inst.Op.get(i + 1);
             if (i < 8) {
-                new MvInstruction(RegA(i), getReg(arg), tempBlock);
+                //small simplify of reg
+                MvOrLi(PhysicalReg.regA(i), arg);
             } else {
                 tempFunc.spilledArg = Math.max(tempFunc.spilledArg, i - 8);
                 var offset = new Stack(i - 8, Stack.StackType.putArg);
@@ -201,7 +249,7 @@ public class InstructionSelector implements IRVisitor {
             }
         }
 
-        new asm.instruction.CallInstruction(inst.Op.get(0).name.substring(1), tempBlock);
+        new asm.instruction.CallInstruction((asm.Function) inst.Op.get(0).asm, tempBlock);
 
         if (!(inst.type instanceof ir.type.VoidType)) {
             new MvInstruction(getReg(inst), a0, tempBlock);
@@ -212,31 +260,43 @@ public class InstructionSelector implements IRVisitor {
         var ptr = inst.Op.get(0);
         var ptrElemType = ((PointerType) ptr.type).element;
         if (ptrElemType instanceof ir.type.ArrayType) {
-            var reg = new VirtualReg(4);
+            //deals with string
+            var reg = getReg(inst);
             var s = (StringConst) ptr.asm;
             new LuiInstruction(reg, new Relocation(s, Relocation.RelocationType.hi), tempBlock);
             new ITypeInstruction("addi", reg, reg, new Relocation(s, Relocation.RelocationType.lo), tempBlock);
-            inst.asm = reg;
         } else if (ptrElemType instanceof ir.type.StructType) {
-            var tmp = new VirtualReg(4);
-            // TODO optimize
-            new ITypeInstruction("slli", tmp, getReg(inst.Op.get(2)), new Imm(2), tempBlock);
-            new RTypeInstruction("add", getReg(inst), getReg(ptr), tmp, tempBlock);
+            //deals with class number
+            var idx = (ir.constant.IntConst) inst.Op.get(2);
+            new ITypeInstruction("addi", getReg(inst), getReg(ptr), new Imm(idx.itself * 4), tempBlock);
         } else {
-            // TODO optimize
+            //deals with other relative easy types
+            var idx = inst.Op.get(1);
+            if (idx instanceof ir.constant.IntConst i) {
+                int val = i.itself * ptrElemType.size();
+                if (val < 1 << 11 && val >= -(1 << 11)) {
+                    new ITypeInstruction("addi", getReg(inst), getReg(ptr),
+                            new Imm(val), tempBlock);
+                } else {
+                    var tmp = new VirtualReg(4);
+                    new LiInstruction(tmp, new Imm(val), tempBlock);
+                    new RTypeInstruction("add", getReg(inst), getReg(ptr), tmp, tempBlock);
+                }
+                return;
+            }
             SimpleReg tmp;
             if (ptrElemType.size() < 4) {
-                tmp = getReg(inst.Op.get(1));
+                tmp = getReg(idx);
             } else {
                 tmp = new VirtualReg(4);
-                new ITypeInstruction("slli", tmp, getReg(inst.Op.get(1)), new Imm(2), tempBlock);
+                new ITypeInstruction("slli", tmp, getReg(idx), new Imm(2), tempBlock);
             }
             new RTypeInstruction("add", getReg(inst), getReg(ptr), tmp, tempBlock);
         }
     }
 
     public void visit(IcmpInstruction inst) {
-        VirtualReg tmp = null;
+        VirtualReg tmp;
         switch (inst.op) {
             case "slt" ->
                     new RTypeInstruction("slt", getReg(inst), getReg(inst.Op.get(0)), getReg(inst.Op.get(1)), tempBlock);
@@ -283,7 +343,7 @@ public class InstructionSelector implements IRVisitor {
 
     public void visit(ir.Instructions.ReturnInstruction inst) {
         if (!inst.Op.isEmpty()) {
-            new MvInstruction(a0, getReg(inst.Op.get(0)), tempBlock);
+            MvOrLi(a0, inst.Op.get(0));
         }
     }
 
@@ -304,19 +364,30 @@ public class InstructionSelector implements IRVisitor {
     }
 
     public void visit(BitCastInstruction inst) {
-        new MvInstruction(getReg(inst), getReg(inst.Op.get(0)), tempBlock);
+        MvOrLi(getReg(inst), inst.Op.get(0));
     }
 
     public void visit(TruncInstruction inst) {
-        var tmp = new VirtualReg(4);
-        new ITypeInstruction("andi", tmp, getReg(inst.Op.get(0)), new Imm(1), tempBlock);
-        new MvInstruction(getReg(inst), tmp, tempBlock);
+        MvOrLi(getReg(inst), inst.Op.get(0));
     }
 
     public void visit(ZextInstruction inst) {
-        var tmp = new VirtualReg(4);
-        new ITypeInstruction("andi", tmp, getReg(inst.Op.get(0)), new Imm(1), tempBlock);
-        new MvInstruction(getReg(inst), tmp, tempBlock);
+        MvOrLi(getReg(inst), inst.Op.get(0));
+    }
+
+    public void visit(MoveInstruction inst) {
+        MvOrLi(getReg(inst), inst.Op.get(0));
+    }
+    //all phis are eliminated when running this.
+    public void visit(PhiInstruction inst) {}
+
+    void MvOrLi(SimpleReg dest, ir.Value src) {
+        var c = getConstVal(src);
+        if (c == null) {
+            new MvInstruction(dest, getReg(src), tempBlock);
+        } else {
+            new LiInstruction(dest, new Imm(c), tempBlock);
+        }
     }
 
 }
