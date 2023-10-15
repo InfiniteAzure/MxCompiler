@@ -135,7 +135,7 @@ public class InstructionSelector implements IRVisitor {
         }
         new MvInstruction(ra, savedRa, tempBlock);
 
-        new ITypeInstruction("addi", sp, sp, new Stack(0, Stack.StackType.incSp),tempBlock);
+        new ITypeInstruction("addi", sp, sp, new Stack(0, Stack.StackType.incSp), tempBlock);
 
         new asm.instruction.RetInstruction(tempBlock);
     }
@@ -144,10 +144,8 @@ public class InstructionSelector implements IRVisitor {
         tempBlock = (Block) block.asm;
         var iter = block.instructions.listIterator(0);
         while (iter.hasNext()) {
-            if (iter.nextIndex() >= block.instructions.size() - 2) {
+            if (iter.nextIndex() >= block.instructions.size() - 2)
                 break;
-            }
-
             var inst = iter.next();
             inst.accept(this);
         }
@@ -164,8 +162,9 @@ public class InstructionSelector implements IRVisitor {
                 case "sle" -> "bgt";
                 default -> null;
             };
-            new asm.instruction.BrInstruction(op, getReg(icmp.Op.get(0)), getReg(icmp.Op.get(1)), (Block) br.Op.get(2).asm, tempBlock);
-            new JumpInstruction((Block)  br.Op.get(1).asm, tempBlock);
+            new asm.instruction.BrInstruction(op, getReg(icmp.Op.get(0)), getReg(icmp.Op.get(1)),
+                    (Block) br.Op.get(2).asm, tempBlock);
+            new JumpInstruction((Block) br.Op.get(1).asm, tempBlock);
         } else {
             if (inst1 != null)
                 inst1.accept(this);
@@ -174,8 +173,8 @@ public class InstructionSelector implements IRVisitor {
         }
     }
 
-    public void visit(AllocaInstruction instruction) {
-        instruction.asm = new Stack(tempFunc.allocaCnt, Stack.StackType.alloca);
+    public void visit(AllocaInstruction inst) {
+        inst.asm = new Stack(tempFunc.allocaCnt, Stack.StackType.alloca);
         tempFunc.allocaCnt++;
     }
 
@@ -216,13 +215,17 @@ public class InstructionSelector implements IRVisitor {
                     iop = "addi";
                     val = -val;
                 }
-                if (val < 1 << 11 && val >= -(1 << 11)) {
+                if (inImmRange(val)) {
                     new ITypeInstruction(iop, getReg(inst), getReg(op1), new Imm(val), tempBlock);
                     return;
                 }
             }
         }
         new RTypeInstruction(op, getReg(inst), getReg(op1), getReg(op2), tempBlock);
+    }
+
+    public boolean inImmRange(int val) {
+        return val < 1 << 11 && val >= -(1 << 11);
     }
 
     public void visit(BrInstruction inst) {
@@ -241,7 +244,7 @@ public class InstructionSelector implements IRVisitor {
                 //small simplify of reg
                 MvOrLi(PhysicalReg.regA(i), arg);
             } else {
-                tempFunc.spilledArg = Math.max(tempFunc.spilledArg, i - 8);
+                tempFunc.spilledArg = Math.max(tempFunc.spilledArg, i - 7);
                 var offset = new Stack(i - 8, Stack.StackType.putArg);
                 new asm.instruction.StoreInstruction(4, getReg(arg), sp, offset, tempBlock);
             }
@@ -352,7 +355,7 @@ public class InstructionSelector implements IRVisitor {
             var tmp = new VirtualReg(4);
             var obj = (GlobalObject) v.asm;
             new LuiInstruction(tmp, new Relocation(obj, Relocation.RelocationType.hi), tempBlock);
-            new StoreInstruction(val.type.size(), getReg(val), tmp, new Relocation(obj, Relocation.RelocationType.lo),tempBlock);
+            new StoreInstruction(val.type.size(), getReg(val), tmp, new Relocation(obj, Relocation.RelocationType.lo), tempBlock);
         } else {
             if (ptr.asm instanceof Stack x)
                 new StoreInstruction(val.type.size(), getReg(val), sp, x, tempBlock);
@@ -374,8 +377,9 @@ public class InstructionSelector implements IRVisitor {
     }
 
     public void visit(MoveInstruction inst) {
-        MvOrLi(getReg(inst.Op.get(0)), inst.Op.get(0));
+        MvOrLi(getReg(inst.Op.get(0)), inst.Op.get(1));
     }
+
     //all phis are eliminated when running this.
     public void visit(PhiInstruction inst) {}
 
