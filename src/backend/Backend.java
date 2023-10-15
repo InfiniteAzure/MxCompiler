@@ -17,11 +17,11 @@ public class Backend {
         new InstructionSelector(asmModule).visit(middleEnd.irModule);
         //printAsm("output.s.no.regalloc");
         new withoutRegAlloca().runOnModule(asmModule);
-        new StackAllocator().runOnModule(asmModule);
-        new BlockMerge().runOnModule(asmModule);
-        new BlockReorder().runOnModule(asmModule);
+        //new StackAllocator().runOnModule(asmModule);
+        //new BlockMerge().runOnModule(asmModule);
+        //new BlockReorder().runOnModule(asmModule);
         //printAsm("output-placement.s");
-        new DIE().runOnModule(asmModule);
+        //new DIE().runOnModule(asmModule);
 
         printAsm("builtin.s");
     }
