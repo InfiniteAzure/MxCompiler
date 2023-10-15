@@ -90,9 +90,9 @@ public class InstructionSelector implements IRVisitor {
         tempFunc = (asm.Function) func.asm;
         module.funcs.add(tempFunc);
 
-        for (var i : func.blocks) {
-            i.asm = new Block(i.name,i.LoopDepth);
-            tempFunc.blocks.add((Block) i.asm);
+        for (var block : func.blocks) {
+            block.asm = new Block(block.name, block.LoopDepth);
+            tempFunc.blocks.add((Block) block.asm);
         }
         tempFunc.entry = (Block) func.entry.asm;
         tempFunc.exit = (Block) func.exit.asm;
@@ -117,13 +117,11 @@ public class InstructionSelector implements IRVisitor {
         }
 
         for (int i = 0; i < func.Op.size(); ++i) {
-            var arg = func.Op.get(i);
             if (i < 8) {
                 new MvInstruction(tempFunc.args.get(i), PhysicalReg.regA(i), tempBlock);
             } else {
-                var reg = new VirtualReg(4);
-                arg.asm = reg;
-                new LoadInstruction(4, reg, sp, new Stack(i - 8, Stack.StackType.getArg), tempBlock);
+                new LoadInstruction(4, tempFunc.args.get(i), sp, new Stack(
+                        i - 8, Stack.StackType.getArg), tempBlock);
             }
         }
 
@@ -137,7 +135,7 @@ public class InstructionSelector implements IRVisitor {
         }
         new MvInstruction(ra, savedRa, tempBlock);
 
-        new ITypeInstruction("addi", sp, sp, new Stack(0, Stack.StackType.incSp), tempBlock);
+        new ITypeInstruction("addi", sp, sp, new Stack(0, Stack.StackType.incSp),tempBlock);
 
         new asm.instruction.RetInstruction(tempBlock);
     }
@@ -337,7 +335,7 @@ public class InstructionSelector implements IRVisitor {
             if (ptr.asm instanceof Stack x)
                 new LoadInstruction(size, getReg(inst), sp, x, tempBlock);
             else
-                new LoadInstruction(size, getReg(inst), (SimpleReg) ptr.asm, new Imm(0), tempBlock);
+                new LoadInstruction(size, getReg(inst), getReg(ptr), new Imm(0), tempBlock);
         }
     }
 
@@ -359,7 +357,7 @@ public class InstructionSelector implements IRVisitor {
             if (ptr.asm instanceof Stack x)
                 new StoreInstruction(val.type.size(), getReg(val), sp, x, tempBlock);
             else
-                new StoreInstruction(val.type.size(), getReg(val), (SimpleReg) ptr.asm, new Imm(0), tempBlock);
+                new StoreInstruction(val.type.size(), getReg(val), getReg(ptr), new Imm(0), tempBlock);
         }
     }
 

@@ -15,17 +15,19 @@ public class Backend {
 
         this.asmModule = new asm.asmModule();
         new InstructionSelector(asmModule).visit(middleEnd.irModule);
-        new RegAllocator().runOnModule(asmModule);
+        //printAsm("output.s.no.regalloc");
+        new withoutRegAlloca().runOnModule(asmModule);
         new StackAllocator().runOnModule(asmModule);
         new BlockMerge().runOnModule(asmModule);
         new BlockReorder().runOnModule(asmModule);
+        //printAsm("output-placement.s");
         new DIE().runOnModule(asmModule);
 
-        printAsm();
+        printAsm("builtin.s");
     }
 
-    void printAsm() throws Exception {
-        var asmFile = new FileOutputStream("output.s");
+    void printAsm(String s) throws Exception {
+        var asmFile = new FileOutputStream(s);
         var asm = new PrintStream(asmFile);
         new asmPrinter(System.out).runOnModule(asmModule);
         asmFile.close();
